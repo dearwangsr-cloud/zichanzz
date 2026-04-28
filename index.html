@@ -1,0 +1,308 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>资产增长预测工具</title>
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="资产增长预测工具">
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f1f5f9;
+            --border: #cbd5e1;
+            --text-main: #1e293b;
+        }
+
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: var(--bg);
+            margin: 0;
+            padding: 8px;
+            color: var(--text-main);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            box-sizing: border-box;
+        }
+
+        h1 { text-align: center; font-size: 18px; margin: 0 0 12px; color: var(--primary); }
+
+        .grid-inputs {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            column-gap: 10px;
+            row-gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .input-group { display: flex; flex-direction: column; }
+        label { font-size: 10px; color: #64748b; margin-bottom: 2px; font-weight: 600; }
+        input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .section-box { border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px; }
+        .section-header { padding: 5px 10px; font-size: 11px; background: #f8fafc; color: #475569; font-weight: bold; border-bottom: 1px solid #e2e8f0; }
+        .section-content { padding: 8px; }
+
+        .dynamic-row {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 6px;
+            align-items: flex-end;
+            background: #f8fafc;
+            padding: 6px;
+            border-radius: 6px;
+        }
+        .row-item { flex: 1; display: flex; flex-direction: column; }
+        .row-item label { font-size: 9px; color: #94a3b8; }
+        .row-item input { font-size: 12px; padding: 4px; border-color: #d1d5db; }
+
+        .btn-calc { 
+            background: var(--primary); color: white; width: 100%; padding: 12px; 
+            border: none; border-radius: 8px; font-size: 16px; font-weight: bold; margin: 8px 0;
+            box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);
+            cursor: pointer;
+        }
+        .btn-add { 
+            background: #fff; color: var(--primary); border: 1px dashed var(--primary); 
+            padding: 5px; border-radius: 6px; font-size: 11px; width: 100%; font-weight: 600;
+        }
+        .btn-remove { 
+            background: #fee2e2; color: #ef4444; border: none; 
+            width: 24px; height: 24px; border-radius: 6px; font-weight: bold;
+        }
+
+        .chart-container { height: 200px; margin: 8px 0; }
+        
+        /* 表格精细化列宽控制 */
+        .table-unit { font-size: 9px; color: #94a3b8; text-align: right; margin-bottom: 2px; }
+        .table-scroll { 
+            width: 100%;
+            border: 1px solid #e2e8f0; 
+            border-radius: 6px;
+            overflow: hidden; 
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            font-size: 11px; 
+            table-layout: fixed; 
+        }
+        th, td { 
+            padding: 8px 1px; /* 极限左右间距 */
+            border-bottom: 1px solid #f1f5f9; 
+            text-align: right; 
+            word-break: break-all;
+        }
+        th { background: #f8fafc; color: #64748b; font-weight: 600; line-height: 1.1; vertical-align: middle; }
+        
+        /* 非对象分配列宽 (总计 100%) */
+        .col-year { width: 9%; text-align: left; padding-left: 4px; color: var(--primary); }
+        .col-sav { width: 13%; }
+        .col-sav-p { width: 11%; color: #10b981; font-size: 10px; }
+        .col-inv { width: 13%; }
+        .col-inv-p { width: 11%; color: #10b981; font-size: 10px; }
+        .col-total { width: 19%; font-weight: bold; color: #0f172a; }
+        .col-pp { width: 24%; padding-right: 4px; font-weight: bold; color: #4f46e5; } 
+
+        @media (min-width: 600px) {
+            .chart-container { height: 300px; }
+            table { font-size: 13px; }
+            th, td { padding: 10px 4px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>资产增长预测工具</h1>
+
+    <div class="grid-inputs">
+        <div class="input-group"><label>月收入(元)</label><input type="number" id="monthlyIncome" value="10000"></div>
+        <div class="input-group"><label>月支出(元)</label><input type="number" id="monthlyExpense" value="5000"></div>
+        <div class="input-group"><label>当前储蓄(元)</label><input type="number" id="initSavings" value="100000"></div>
+        <div class="input-group"><label>储蓄收益%</label><input type="number" id="savingsRate" value="2" step="0.1"></div>
+        <div class="input-group"><label>预测年限</label><input type="number" id="years" value="20"></div>
+    </div>
+
+    <div class="section-box">
+        <div class="section-header">理财账户 (可选)</div>
+        <div class="section-content">
+            <div id="invest-list"></div>
+            <button class="btn-add" onclick="addItem('invest-list')">+ 添加账户</button>
+        </div>
+    </div>
+
+    <div class="section-box">
+        <div class="section-header">大宗支出 (可选)</div>
+        <div class="section-content">
+            <div id="expense-list"></div>
+            <button class="btn-add" onclick="addItem('expense-list')">+ 添加计划</button>
+        </div>
+    </div>
+
+    <button class="btn-calc" onclick="calculate()">计算并绘制资产曲线</button>
+
+    <div class="chart-container"><canvas id="assetChart"></canvas></div>
+
+    <div class="table-unit">单位: 万元</div>
+    <div class="table-scroll">
+        <table>
+            <thead>
+                <tr>
+                    <th class="col-year">年份</th>
+                    <th class="col-sav">储蓄</th>
+                    <th class="col-sav-p">收益</th>
+                    <th class="col-inv">理财</th>
+                    <th class="col-inv-p">收益</th>
+                    <th class="col-total">总资产</th>
+                    <th class="col-pp">购买力<br>(通胀2%)</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let myChart = null;
+
+    function addItem(containerId) {
+        const container = document.getElementById(containerId);
+        const div = document.createElement('div');
+        div.className = 'dynamic-row';
+        if (containerId === 'invest-list') {
+            div.innerHTML = `
+                <div class="row-item"><label>已有</label><input type="number" class="inv-init" value="0"></div>
+                <div class="row-item"><label>月投</label><input type="number" class="inv-amount" value="2000"></div>
+                <div class="row-item"><label>年化%</label><input type="number" class="inv-rate" value="5.0"></div>
+                <button class="btn-remove" onclick="this.parentElement.remove()">×</button>
+            `;
+        } else {
+            div.innerHTML = `
+                <div class="row-item"><label>第几年</label><input type="number" class="exp-year" value="5"></div>
+                <div class="row-item"><label>金额</label><input type="number" class="exp-amount" value="50000"></div>
+                <button class="btn-remove" onclick="this.parentElement.remove()">×</button>
+            `;
+        }
+        container.appendChild(div);
+    }
+
+    function calculate() {
+        const monthlyIncome = parseFloat(document.getElementById('monthlyIncome').value) || 0;
+        const monthlyExpense = parseFloat(document.getElementById('monthlyExpense').value) || 0;
+        let curSav = parseFloat(document.getElementById('initSavings').value) || 0;
+        const savRate = (parseFloat(document.getElementById('savingsRate').value) || 0) / 100;
+        const years = parseInt(document.getElementById('years').value) || 1;
+
+        const invInitials = Array.from(document.querySelectorAll('.inv-init')).map(i => parseFloat(i.value) || 0);
+        const invAmounts = Array.from(document.querySelectorAll('.inv-amount')).map(i => parseFloat(i.value) || 0);
+        const invRates = Array.from(document.querySelectorAll('.inv-rate')).map(i => (parseFloat(i.value) || 0) / 100);
+        let totalMonthlyInv = invAmounts.reduce((a, b) => a + b, 0);
+        let curInvAssets = [...invInitials];
+
+        const expYears = Array.from(document.querySelectorAll('.exp-year')).map(i => parseInt(i.value));
+        const expAmounts = Array.from(document.querySelectorAll('.exp-amount')).map(i => parseFloat(i.value));
+
+        const labels = [], dSav = [], dInv = [], dTotal = [];
+        const tableBody = document.getElementById('tableBody');
+        tableBody.innerHTML = '';
+
+        for (let y = 0; y <= years; y++) {
+            let ySavP = 0, yInvP = 0;
+            if (y > 0) {
+                for (let m = 1; m <= 12; m++) {
+                    invAmounts.forEach((add, idx) => {
+                        let p = curInvAssets[idx] * (invRates[idx] / 12);
+                        yInvP += p; curInvAssets[idx] += p + add;
+                    });
+                    let sP = curSav * (savRate / 12);
+                    ySavP += sP; curSav += sP + (monthlyIncome - monthlyExpense - totalMonthlyInv);
+                }
+                expYears.forEach((ey, idx) => { if (ey === y) curSav -= expAmounts[idx]; });
+            }
+
+            let totalInv = curInvAssets.reduce((a, b) => a + b, 0);
+            let totalAsset = curSav + totalInv;
+            let purchasingPower = totalAsset / Math.pow(1.02, y);
+
+            labels.push(`${y}年`);
+            dSav.push((curSav / 10000).toFixed(2));
+            dInv.push((totalInv / 10000).toFixed(2));
+            dTotal.push((totalAsset / 10000).toFixed(2));
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="col-year">${y}年</td>
+                <td class="col-sav">${(curSav / 10000).toFixed(1)}</td>
+                <td class="col-sav-p">${y===0?'-':'+'+(ySavP / 10000).toFixed(1)}</td>
+                <td class="col-inv">${(totalInv / 10000).toFixed(1)}</td>
+                <td class="col-inv-p">${y===0?'-':'+'+(yInvP / 10000).toFixed(1)}</td>
+                <td class="col-total">${(totalAsset / 10000).toFixed(1)}</td>
+                <td class="col-pp">${(purchasingPower / 10000).toFixed(1)}</td>
+            `;
+            tableBody.appendChild(tr);
+        }
+        renderChart(labels, dSav, dInv, dTotal);
+    }
+
+    function renderChart(labels, savings, invest, total) {
+        const ctx = document.getElementById('assetChart').getContext('2d');
+        if (myChart) myChart.destroy();
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: '总资产', data: total, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', fill: true, tension: 0.3, borderWidth: 2, pointRadius: 2, hitRadius: 15 },
+                    { label: '储蓄', data: savings, borderColor: '#10b981', borderDash: [5, 5], tension: 0.3, pointRadius: 0 },
+                    { label: '理财', data: invest, borderColor: '#f59e0b', borderDash: [5, 5], tension: 0.3, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { 
+                    legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+                    tooltip: { callbacks: { label: (c) => c.dataset.label + ': ' + c.parsed.y + ' 万' } }
+                },
+                scales: { 
+                    y: { ticks: { font: { size: 10 } } },
+                    x: { ticks: { font: { size: 10 }, maxRotation: 0 } }
+                }
+            }
+        });
+    }
+    window.onload = calculate;
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js');
+  });
+}
+</script>
+</body>
+</html>
