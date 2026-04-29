@@ -1,4 +1,4 @@
-﻿const CACHE_NAME = 'asset-tool-v' + Date.now();
+﻿const CACHE_NAME = 'asset-tool-v260429' + Date.now();
 
 const CORE_FILES = [
   './',
